@@ -1,8 +1,7 @@
-# v0.52 
-# додати можливість зберігання одного й того ж контакта з різними номерами. Зараз відбувається перезапис по імені контакту
-# додати можливість видалення контакту як за ім'ям так і за номером
+# v_5.3 Full fuctional works
 
 from collections import UserDict
+
 
 class Field:
     def __init__(self, value):
@@ -37,45 +36,38 @@ class Record:
         self.name = Name(name)
         self.phones = [Phone(phone) for phone in phones]
 
+    def add_phone(self, phone):
+        self.phones.append(Phone(phone))
+
+    def remove_phone(self, phone):
+        self.phones = [p for p in self.phones if p.number != phone]
+
+    def edit_phone(self, old_phone, new_phone):
+        for phone in self.phones:
+            if phone.number == old_phone:
+                phone.number = new_phone
+                return
+        raise ValueError(f"Phone '{old_phone}' not found.")
+
+    def find_phone(self, phone):
+        for p in self.phones:
+            if p.number == phone:
+                return p
+        return None
+
 
 class AddressBook(UserDict):
     """
     Клас для зберігання та управління записами.
     """
     def add_record(self, record):
-        self.data[record.name.name] = record.phones
+        self.data[record.name.name] = record
 
     def delete_record(self, name):
         del self.data[name]
 
     def find_record(self, name):
-        if name in self.data:
-            return self.data[name]
-        else:
-            return None
-
-    def add_phone(self, name, phone):
-        if name in self.data:
-            self.data[name].append(Phone(phone))
-        else:
-            raise KeyError(f"Contact '{name}' not found in the address book.")
-
-    def delete_phone(self, name, phone):
-        if name in self.data:
-            self.data[name] = [p for p in self.data[name] if p.number != phone]
-        else:
-            raise KeyError(f"Contact '{name}' not found in the address book.")
-
-    def change_phone(self, name, old_phone, new_phone):
-        if name in self.data:
-            for p in self.data[name]:
-                if p.number == old_phone:
-                    p.number = new_phone
-                    break
-            else:
-                raise ValueError(f"Phone '{old_phone}' not found for contact '{name}'.")
-        else:
-            raise KeyError(f"Contact '{name}' not found in the address book.")
+        return self.data.get(name, None)
 
 
 def input_error(func):
@@ -105,8 +97,12 @@ def change_contact(address_book, name, old_number, new_number):
     """
     Змінює номер телефону для вказаного контакту.
     """
-    address_book.change_phone(name, old_number, new_number)
-    print(f"Number for contact '{name}' changed from '{old_number}' to '{new_number}'.")
+    record = address_book.find_record(name)
+    if record:
+        record.edit_phone(old_number, new_number)
+        print(f"Number for contact '{name}' changed from '{old_number}' to '{new_number}'.")
+    else:
+        print(f"Contact '{name}' not found.")
 
 
 @input_error
@@ -114,9 +110,9 @@ def show_phone(address_book, name):
     """
     Виводить номер телефону для вказаного контакту.
     """
-    numbers = address_book.find_record(name)
-    if numbers:
-        print(f"The phone number(s) for '{name}' is/are {', '.join([p.number for p in numbers])}.")
+    record = address_book.find_record(name)
+    if record:
+        print(f"The phone number(s) for '{name}' is/are {', '.join([p.number for p in record.phones])}.")
     else:
         print(f"No phone number found for contact '{name}'.")
 
@@ -127,8 +123,63 @@ def show_all_contacts(address_book):
     Виводить всі контакти телефонної книги.
     """
     print("All contacts in the address book:")
-    for name, numbers in address_book.items():
-        print(f"{name}: {', '.join([p.number for p in numbers])}")
+    for name, record in address_book.items():
+        print(f"{name}: {', '.join([p.number for p in record.phones])}")
+
+
+@input_error
+def add_phone_to_contact(address_book, name, phone):
+    """
+    Додає номер телефону до існуючого контакту.
+    """
+    record = address_book.find_record(name)
+    if record:
+        record.add_phone(phone)
+        print(f"Phone '{phone}' added to contact '{name}'.")
+    else:
+        print(f"Contact '{name}' not found.")
+
+
+@input_error
+def remove_phone_from_contact(address_book, name, phone):
+    """
+    Видаляє номер телефону з існуючого контакту.
+    """
+    record = address_book.find_record(name)
+    if record:
+        record.remove_phone(phone)
+        print(f"Phone '{phone}' removed from contact '{name}'.")
+    else:
+        print(f"Contact '{name}' not found.")
+
+
+@input_error
+def edit_phone_in_contact(address_book, name, old_phone, new_phone):
+    """
+    Редагує номер телефону в існуючому контакті.
+    """
+    record = address_book.find_record(name)
+    if record:
+        record.edit_phone(old_phone, new_phone)
+        print(f"Phone number for contact '{name}' changed from '{old_phone}' to '{new_phone}'.")
+    else:
+        print(f"Contact '{name}' not found.")
+
+
+@input_error
+def find_phone_in_contact(address_book, name, phone):
+    """
+    Знаходить номер телефону в існуючому контакті.
+    """
+    record = address_book.find_record(name)
+    if record:
+        phone_record = record.find_phone(phone)
+        if phone_record:
+            print(f"Phone '{phone}' found in contact '{name}'.")
+        else:
+            print(f"Phone '{phone}' not found in contact '{name}'.")
+    else:
+        print(f"Contact '{name}' not found.")
 
 
 def parse_input(command):
@@ -154,31 +205,56 @@ def main():
 
         cmd, args = parse_input(command)
 
-        if cmd == "hello":
-            print("How can I help you?")
+        match cmd:
+            case "hello":
+                print("How can I help you?")
 
-        elif cmd == "add":
-            if len(args) >= 2:
-                add_contact(address_book, args[0], *args[1:])
-            else:
-                print("Invalid number of arguments for 'add' command.")
+            case "add":
+                if len(args) >= 2:
+                    add_contact(address_book, args[0], *args[1:])
+                else:
+                    print("Invalid number of arguments for 'add' command.")
 
-        elif cmd == "change":
-            if len(args) == 3:
-                change_contact(address_book, args[0], args[1], args[2])
-            else:
-                print("Invalid number of arguments for 'change' command.")
+            case "change":
+                if len(args) == 3:
+                    change_contact(address_book, args[0], args[1], args[2])
+                else:
+                    print("Invalid number of arguments for 'change' command.")
 
-        elif cmd == "show":
-            if len(args) == 1:
-                show_phone(address_book, args[0])
-            elif len(args) == 0:
-                show_all_contacts(address_book)
-            else:
-                print("Invalid number of arguments for 'show' command.")
+            case "show":
+                if len(args) == 1:
+                    show_phone(address_book, args[0])
+                elif len(args) == 0:
+                    show_all_contacts(address_book)
+                else:
+                    print("Invalid number of arguments for 'show' command.")
 
-        else:
-            print("Invalid command. Type again!")
+            case "add_phone":
+                if len(args) == 2:
+                    add_phone_to_contact(address_book, args[0], args[1])
+                else:
+                    print("Invalid number of arguments for 'add_phone' command.")
+
+            case "remove_phone":
+                if len(args) == 2:
+                    remove_phone_from_contact(address_book, args[0], args[1])
+                else:
+                    print("Invalid number of arguments for 'remove_phone' command.")
+
+            case "edit_phone":
+                if len(args) == 3:
+                    edit_phone_in_contact(address_book, args[0], args[1], args[2])
+                else:
+                    print("Invalid number of arguments for 'edit_phone' command.")
+
+            case "find_phone":
+                if len(args) == 2:
+                    find_phone_in_contact(address_book, args[0], args[1])
+                else:
+                    print("Invalid number of arguments for 'find_phone' command.")
+
+            case _:
+                print("Invalid command. Type again!")
 
 
 if __name__ == "__main__":
